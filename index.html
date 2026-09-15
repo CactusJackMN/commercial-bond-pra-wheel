@@ -3,73 +3,235 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Commercial Bond PRA Wheel</title>
+<title>PRA review desk</title>
 <style>
-:root{--bg:#0b1020;--panel:#121a30;--panel-2:#18233f;--line:#2a3a62;--text:#e8eefc;--muted:#93a0c2}
-*{box-sizing:border-box}html,body{margin:0;height:100%;background:#0b1020;color:var(--text);font-family:Segoe UI,system-ui,sans-serif}
-header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--line);background:#0b1020cc}
-h1{font-size:18px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:3px}
-button,input[type=text]{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px}button{cursor:pointer}
-.layout{display:grid;grid-template-columns:320px 1fr;height:calc(100% - 64px)}
-aside{border-right:1px solid var(--line);background:var(--panel);overflow:auto;padding:12px}
-.factor{display:grid;grid-template-columns:28px 1fr 44px;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #1c2744}
-.idx,.name{font-size:12px}.name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-svg{width:100%;height:100%;display:block}
-.modal-back{position:fixed;inset:0;background:#040812b8;display:none;align-items:center;justify-content:center;z-index:20}
-.modal-back.open{display:flex}
-.modal{width:min(980px,94vw);max-height:90vh;overflow:auto;background:#10182c;border:1px solid var(--line);border-radius:14px}
-.node{border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--panel-2);min-width:160px;text-align:center;font-size:13px}
-.row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:8px 0 16px}
-.col{display:flex;flex-direction:column;align-items:center}
-.gate{font-size:10px;color:var(--muted);margin:6px 0;text-transform:uppercase}
-.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 18px}
-.kpi{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.hint{position:absolute;left:16px;bottom:14px;color:var(--muted);font-size:12px}
-main{position:relative;overflow:hidden}
-</style></head><body>
-<header><div><h1>Commercial Bond PRA Wheel</h1><div class="sub">28 surveillance factors · click a node for the PRA tree</div></div>
-<div><button id="randomBtn">Sample scores</button> <button id="resetBtn">Reset mid</button> <button id="exportBtn">Download JSON</button></div></header>
-<div class="layout"></div>
+  :root {
+    --bg:#0b1020; --panel:#121a30; --card:#18233f; --line:#2a3a62;
+    --text:#e8eefc; --muted:#93a0c2; --ok:#34d399; --mid:#fbbf24;
+    --hi:#f97316; --bad:#ef4444; --miss:#7dd3fc;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:radial-gradient(900px 500px at 50% 0,#152044,var(--bg)); color:var(--text); font-family:"Segoe UI",system-ui,sans-serif; }
+  header { display:flex; justify-content:space-between; align-items:flex-start; padding:18px 24px 10px; gap:16px; }
+  h1 { margin:0; font-size:20px; font-weight:600; }
+  .sub { color:var(--muted); font-size:13px; margin-top:4px; }
+  .tabs { display:flex; gap:6px; padding:0 24px 12px; }
+  .tabs button { background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:999px; padding:7px 14px; cursor:pointer; font-size:13px; }
+  .tabs button.on { background:#1d4ed8; border-color:#3b82f6; }
+  .wrap { padding:0 24px 28px; }
+  .tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+  .tile .k { color:var(--muted); font-size:11px; letter-spacing:.06em; text-transform:uppercase; }
+  .tile .v { font-size:22px; margin:6px 0 4px; }
+  .tile .d { color:var(--muted); font-size:12px; }
+  .grid { display:grid; grid-template-columns:1.15fr .85fr; gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; }
+  .card h2 { margin:0; padding:12px 16px; font-size:14px; border-bottom:1px solid var(--line); }
+  .alert { display:grid; grid-template-columns:72px 1fr auto; gap:10px; padding:12px 16px; border-bottom:1px solid #1c2744; cursor:pointer; }
+  .alert:hover { background:#1a2542; }
+  .tag { font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:8px 12px; border-bottom:1px solid #1c2744; }
+  th { color:var(--muted); font-weight:600; font-size:11px; letter-spacing:.04em; }
+  .bar { height:8px; background:#0c1426; border-radius:99px; overflow:hidden; display:flex; }
+  .bar span { display:block; height:100%; }
+  .modal-back { position:fixed; inset:0; background:#040812b8; display:none; align-items:center; justify-content:center; z-index:20; }
+  .modal-back.open { display:flex; }
+  .modal { width:min(860px,94vw); max-height:90vh; overflow:auto; background:#10182c; border:1px solid var(--line); border-radius:14px; }
+  .modal header { position:sticky; top:0; background:#10182c; border-bottom:1px solid var(--line); }
+  .spark { display:flex; align-items:flex-end; gap:3px; height:56px; padding:8px 16px 0; }
+  .spark i { flex:1; background:#33466f; border-radius:2px 2px 0 0; }
+  .note { color:var(--muted); font-size:13px; padding:0 16px 16px; line-height:1.45; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; border:1px solid var(--line); }
+  button.ghost { background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px 12px; cursor:pointer; }
+  @media (max-width:980px){ .tiles,.grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Review desk — High Plains Solar 1</h1>
+    <div class="sub">As of 14 Sep 2026 · PPA + merchant tail · residual after hedge is the number that matters · missing data is shown, not assumed fine</div>
+    <div class="sub" style="margin-top:8px">
+      <a href="index.html" style="color:#93c5fd">Review desk</a>
+      · <a href="category.html" style="color:#93c5fd">7-category wheel</a>
+      · <a href="factors.html" style="color:#93c5fd">28-factor wheel</a>
+    </div>
+  </div>
+  <div class="sub" style="text-align:right">Hub condition<br><b style="color:#f97316;font-size:18px">Elevated</b><br>driven by Legal & claims / hedge expiry</div>
+</header>
+<div class="tabs">
+  <button class="on" data-tab="overview">Overview</button>
+  <button data-tab="protect">Protection</button>
+  <button data-tab="cats">Categories</button>
+  <button data-tab="charts">Selective charts</button>
+</div>
+<div class="wrap" id="view"></div>
+<div class="modal-back" id="modalBack">
+  <div class="modal">
+    <header>
+      <div>
+        <h1 id="modalTitle" style="font-size:16px">Alert</h1>
+        <div class="sub" id="modalSub"></div>
+      </div>
+      <button class="ghost" id="closeModal">Close</button>
+    </header>
+    <div id="modalBody"></div>
+  </div>
+</div>
 <script>
-const FACTORS=[
-{id:"claims",name:"Bond claims history",group:"Character",scope:"Specific",assess:"Prior and current claims, reserves, recoveries.",sources:["Internal loss runs","Obligee demand letters","Prior-surety loss runs"]},
-{id:"suits",name:"Lawsuits, judgments, liens",group:"Character",scope:"General",assess:"Litigation, judgments, recorded liens.",sources:["PACER","County indexes","LexisNexis"]},
-{id:"taxucc",name:"Tax liens and UCC filings",group:"Character",scope:"General",assess:"Tax liens and Article 9 filings.",sources:["IRS/state liens","SoS UCC","County tax liens"]},
-{id:"bk",name:"Bankruptcy and insolvency",group:"Character",scope:"General",assess:"Ch. 7/11/13, receivership, ABC.",sources:["PACER BK","Bureau flags","Receivership notices"]},
-{id:"trade",name:"Vendor and trade payment history",group:"Character",scope:"General",assess:"Pays suppliers and trade creditors on time.",sources:["D&B PAYDEX","NACM","Trade references"]},
-{id:"integrity",name:"Management integrity / ownership change",group:"Character",scope:"General",assess:"Integrity, ownership change, key-person exit.",sources:["SoS filings","Adverse media","Field reports"]},
-{id:"license",name:"Regulatory actions and license status",group:"Character",scope:"Specific",assess:"Suspensions, revocations, consent orders.",sources:["Licensing boards","Consent orders","Regulator notices"]},
-{id:"media",name:"Reputation and adverse media",group:"Character",scope:"General",assess:"Public reputation hits.",sources:["News wires","Media scans","Complaint sites"]},
-{id:"perform",name:"Ability to perform the obligation",group:"Capacity",scope:"Specific",assess:"Still licensed and operating in the bonded line.",sources:["License status","Site check","Producer"]},
-{id:"experience",name:"Experience in the bonded line",group:"Capacity",scope:"Specific",assess:"Track record in the bonded activity.",sources:["Application","Prior-surety files","References"]},
-{id:"ops",name:"Operational stability",group:"Capacity",scope:"General",assess:"Staffing, systems, locations.",sources:["Financial footnotes","Field inspection","Interview"]},
-{id:"continuity",name:"Continuity of management / ownership",group:"Capacity",scope:"General",assess:"Key-person and control continuity.",sources:["Ownership records","Key-man files","Succession docs"]},
-{id:"compliance",name:"Statutory / permit / contract compliance",group:"Capacity",scope:"Specific",assess:"Ongoing compliance with the rule that required the bond.",sources:["Obligee notices","Audits","Statute/permit"]},
-{id:"stmts",name:"Financial statements",group:"Capital",scope:"General",assess:"Statement quality and timeliness.",sources:["CPA package","EDGAR","Comfort letters"]},
-{id:"liquidity",name:"Working capital and liquidity",group:"Capital",scope:"General",assess:"Current ratio and cash.",sources:["Interims","Bank statements","Bureau liquidity"]},
-{id:"profit",name:"Profitability and cash-flow trends",group:"Capital",scope:"General",assess:"Earnings and cash conversion.",sources:["Income stmt","Cash flow","Tax returns"]},
-{id:"leverage",name:"Leverage and debt service",group:"Capital",scope:"General",assess:"Debt load and coverage.",sources:["Debt schedules","Credit agreements","Bureau leverage"]},
-{id:"bizcredit",name:"Business credit scores",group:"Capital",scope:"General",assess:"Commercial bureau scores.",sources:["D&B","Experian Biz","Equifax Commercial"]},
-{id:"perscredit",name:"Personal credit of owners / indemnitors",group:"Capital",scope:"General",assess:"Consumer-bureau condition of indemnitors.",sources:["Experian","Equifax","TransUnion"]},
-{id:"taxret",name:"Tax returns and tax-compliance status",group:"Capital",scope:"General",assess:"Filing status and tax liabilities.",sources:["Business returns","Personal returns","Transcripts"]},
-{id:"distress",name:"Public-record financial distress signals",group:"Capital",scope:"General",assess:"Deterioration vs underwriting in public records.",sources:["Bureau public records","D&B stress","News/court"]},
-{id:"collateral",name:"Status and value of pledged collateral",group:"Collateral",scope:"Specific",assess:"Existence, perfection, current value.",sources:["Custodian","Appraisals","UCC-1"]},
-{id:"indemnity",name:"Indemnity agreements still in force",group:"Collateral",scope:"Specific",assess:"GAI still binding and collectible.",sources:["GAI file","Counsel","Authority docs"]},
-{id:"guarantor",name:"Personal guarantor financial condition",group:"Collateral",scope:"General",assess:"Indemnitor net worth and collectability.",sources:["PFS","Bureaus","Tax returns"]},
-{id:"macro",name:"Industry and macroeconomic conditions",group:"Conditions",scope:"General",assess:"Cycle, rates, unemployment, sector policy.",sources:["BLS/Fed","Industry data","Political risk notes"]},
-{id:"bondform",name:"Bond-form and obligation changes",group:"Conditions",scope:"Specific",assess:"Hazardous clauses and form revisions.",sources:["Bond file","Obligee forms","SFAA notes"]},
-{id:"concentration",name:"Exposure concentration",group:"Conditions",scope:"General",assess:"Single-name, industry, or geo clusters.",sources:["Exposure reports","Producer reports","Geo maps"]},
-{id:"cadence",name:"Monitoring cadence vs. credit quality",group:"Conditions",scope:"General",assess:"Review frequency vs residual risk.",sources:["Surveillance calendar","Rating policy","Exception logs"]}
+const ALERTS = [
+  { id:"hedge-expiry", kind:"review", title:"Price hedge rolls off in 11 months", impact:"Leaves ~38% of expected year-5 energy unsold at floating price", protect:"PPA covers 62% through 2031; swap covers 28% through Oct 2027", stale:false, asOf:"2026-09-01",
+    trend:[62,62,62,58,54,50],
+    data:"Swap notional 80 GWh/yr · settlement hub SP-15 · project realization last 12 mo averaged $2.40/MWh under hub. Counterparty A- rated; independent amount $1.2mm posted.",
+    branch:"Conditions → remaining electricity-price exposure. Hedge does not automatically follow LNG/coal prices — correlation to this project's PPA-plus-merchant cash flow must hold under stress.",
+    type:"stat-or-contract", threshold:"Contractual: PPA volume. Economic: residual merchant after swap expiry." },
+  { id:"basis", kind:"change", title:"Hedge settlement vs realized price widened", impact:"Last quarter basis cost ~$190k vs $60k budget", protect:"Swap still on; coverage unchanged", stale:false, asOf:"2026-08-31",
+    trend:[0.4,0.6,0.8,1.1,1.8,2.4],
+    data:"SP-15 settlement minus project realized price, $/MWh. Widening after congestion on the gen-tie.",
+    branch:"Credit / Conditions → basis is residual exposure the hedge does not remove.",
+    type:"stat", threshold:"Statistical watch at 1.5σ of 3-year basis. Not a covenant." },
+  { id:"gen", kind:"change", title:"Generation below weather-adjusted plan", impact:"Q3 energy 7% light vs weather-normalized budget", protect:"PPA take-or-pay on contracted block still intact", stale:false, asOf:"2026-09-10",
+    trend:[101,98,99,96,94,93],
+    data:"Actual / weather-adjusted expected generation (%). Seasonality stripped with trailing 5-year month factors. Volatility rose after inverter derate.",
+    branch:"Capacity → operational stability. Chart limits not yet re-estimated for the new volatility regime.",
+    type:"stat", threshold:"Statistical warning only. DSCR covenant is separate (see below)." },
+  { id:"dscr", kind:"review", title:"DSCR headroom tighter than chart warning", impact:"Projected next-test DSCR 1.18 vs 1.20 lock-up", protect:"Cash sweep / distribution lock-up, not default", stale:false, asOf:"2026-09-01",
+    trend:[1.41,1.36,1.31,1.27,1.22,1.19],
+    data:"Forward DSCR using residual energy price after hedge, not the swap settlement price.",
+    branch:"Capital → leverage and debt service. Contractual threshold — different playbook from the generation chart.",
+    type:"contract", threshold:"Lock-up 1.20 · default 1.05. Do not treat as a control-chart limit." },
+  { id:"cp", kind:"review", title:"Hedge counterparty watch", impact:"If swap fails, residual merchant jumps from 10% to 38% immediately", protect:"CSA in place; independent amount posted", stale:false, asOf:"2026-09-08",
+    trend:[92,92,90,88,86,84],
+    data:"Internal CP score 84 (A- equivalent). Collateral call last week +$0.3mm.",
+    branch:"Credit → counterparty strength and collateral requirement.",
+    type:"contract", threshold:"CSA threshold and rating trigger, not a statistical band." },
+  { id:"stale-ins", kind:"missing", title:"Insurance certificate older than 120 days", impact:"Cannot confirm existing protection on property / delay-in-startup", protect:"Unknown — last cert 12 May 2026", stale:true, asOf:"2026-05-12",
+    trend:[],
+    data:"No file received since May. Silence is not coverage.",
+    branch:"Collateral / Conditions → existing protection tile stays amber until a fresh cert is in.",
+    type:"missing", threshold:"Internal freshness rule: 90 days." }
 ];
-function treeFor(f){return{top:f.name+" impairs recoverability of the bonded obligation",ands:[{title:"Condition deteriorates",leaves:[f.assess,"Change is material vs underwriting","Signal confirmed"]},{title:"Surveillance / control gap",leaves:["Source stale or missing","No timely escalation","No residual mitigation"]}],ors:[{title:"Loss path",leaves:["Claim / forfeiture","Uncollectible indemnity","Reserve / capital hit"]},{title:"Book path",leaves:["Rating downgrade","Capacity cut","Cluster loss"]}],notes:"Sources: "+f.sources.join(" · ")+" · Scope: "+f.scope}}
-const TREES=Object.fromEntries(FACTORS.map(f=>[f.id,treeFor(f)]));
-const state={investment:"Subject commercial bond / principal",scores:Object.fromEntries(FACTORS.map(f=>[f.id,5]))};
-function riskColor(s){return s<=3?"#34d399":s<=5?"#fbbf24":s<=7?"#f97316":"#ef4444"}
-function riskLabel(s){return s<=3?"Low":s<=5?"Moderate":s<=7?"Elevated":"Critical"}
-function thickness(s){return 1.4+(s/10)*7.5}
-function renderSidebar(){const el=document.getElementById("sidebar");el.innerHTML=`<label class="sub">Hub name</label><input id="invName" type="text" value="${state.investment}" style="width:100%;margin:6px 0 12px">`+FACTORS.map((f,i)=>`<div class="factor"><div class="idx">${String(i+1).padStart(2,"0")}</div><div><div class="name" title="${f.group} · ${f.scope}">${f.name}</div><input type="range" min="1" max="10" value="${state.scores[f.id]}" data-id="${f.id}"></div><div style="color:${riskColor(state.scores[f.id])}">${state.scores[f.id]}</div></div>`).join("");el.querySelector("#invName").oninput=e=>{state.investment=e.target.value||"Subject";draw()};el.querySelectorAll("input[type=range]").forEach(r=>r.oninput=e=>{state.scores[e.target.dataset.id]=+e.target.value;renderSidebar();draw()})}
-function draw(){const svg=document.getElementById("wheel");const W=svg.clientWidth||900,H=svg.clientHeight||700,cx=W/2,cy=H/2,R=Math.min(W,H)*0.36,n=FACTORS.length;let spokes="",nodes="",labels="";FACTORS.forEach((f,i)=>{const ang=-Math.PI/2+(i/n)*Math.PI*2,x=cx+Math.cos(ang)*R,y=cy+Math.sin(ang)*R,s=state.scores[f.id],col=riskColor(s);spokes+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${col}" stroke-width="${thickness(s)}" stroke-linecap="round"/>`;nodes+=`<circle class="risk-node" data-id="${f.id}" cx="${x}" cy="${y}" r="${9+s*0.7}" fill="${col}" stroke="#0b1020" stroke-width="2" style="cursor:pointer"/>`;const lx=cx+Math.cos(ang)*(R+36),ly=cy+Math.sin(ang)*(R+36),anchor=Math.cos(ang)>0.15?"start":Math.cos(ang)<-0.15?"end":"middle";labels+=`<text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="#c9d4f0" font-size="11" class="risk-node" data-id="${f.id}" style="cursor:pointer">${i+1}. ${f.name}</text>`});const agg=FACTORS.reduce((a,f)=>a+state.scores[f.id],0)/n;svg.innerHTML=spokes+`<circle cx="${cx}" cy="${cy}" r="58" fill="#1e3a5f" stroke="${riskColor(agg)}" stroke-width="4"/><text x="${cx}" y="${cy-8}" text-anchor="middle" fill="#7dd3fc" font-size="12">BOND / PRINCIPAL</text><text x="${cx}" y="${cy+10}" text-anchor="middle" fill="#e8eefc" font-size="13">${escapeXml((state.investment||"").slice(0,22))}</text><text x="${cx}" y="${cy+28}" text-anchor="middle" fill="${riskColor(agg)}" font-size="11">agg ${agg.toFixed(1)} / 10</text>`+nodes+labels;svg.querySelectorAll(".risk-node").forEach(el=>el.onclick=()=>openTree(el.dataset.id))}
-function escapeXml(s){return s.replace(/[&<>]/g,c=>({"&":"&","<":"<",">":">"}[c]))}
-function openTree(id){const f=FACTORS.find(x=>x.id===id),t=TREES[id],s=state.scores[id];document.getElementById("modalTitle").textContent="PRA tree · "+f.name;document.getElementById("modalSub").textContent=`${state.investment} · ${s}/10 (${riskLabel(s)}) · ${f.group} · ${f.scope}`;document.getElementById("modalBody").innerHTML=`<div class="meta"><div class="kpi"><span class="sub">Score</span><b style="color:${riskColor(s)}">${s}/10</b></div><div class="kpi"><span class="sub">Band</span><b>${riskLabel(s)}</b></div><div class="kpi"><span class="sub">Group</span><b>${f.group}</b></div><div class="kpi"><span class="sub">Scope</span><b>${f.scope}</b></div></div><div style="text-align:center"><div class="node">${t.top}</div><div class="gate">AND</div><div class="row">${t.ands.map(b=>`<div class="col"><div class="node">${b.title}</div><div class="gate">OR</div>${b.leaves.map(l=>`<div class="node" style="margin:4px 0">${l}</div>`).join("")}</div>`).join("")}</div><div class="gate">OR — consequence channels</div><div class="row">${t.ors.map(b=>`<div class="col"><div class="node">${b.title}</div>${b.leaves.map(l=>`<div class="node" style="margin:4px 0">${l}</div>`).join("")}</div>`).join("")}</div><p class="sub">${t.notes}</p></div>`;document.getElementById("modalBack").classList.add("open")}
-document.addEventListener("DOMContentLoaded",()=>{document.querySelector(".layout").innerHTML=`<aside id="sidebar"></aside><main><svg id="wheel"></svg><div class="hint">Click a node to open its PRA tree.</div></main><div class="modal-back" id="modalBack"><div class="modal"><header><div><h1 id="modalTitle">PRA tree</h1><div class="sub" id="modalSub"></div></div><button id="closeModal">Close</button></header><div id="modalBody" style="padding:16px"></div></div></div>`;renderSidebar();draw();addEventListener("resize",draw);document.getElementById("closeModal").onclick=()=>document.getElementById("modalBack").classList.remove("open");document.getElementById("randomBtn").onclick=()=>{FACTORS.forEach(f=>state.scores[f.id]=1+Math.floor(Math.random()*10));renderSidebar();draw()};document.getElementById("resetBtn").onclick=()=>{FACTORS.forEach(f=>state.scores[f.id]=5);renderSidebar();draw()};document.getElementById("exportBtn").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({investment:state.investment,scores:state.scores},null,2)]));a.download="pra-wheel-scores.json";a.click()}});
-</script></body></html>
+
+const HEDGES = [
+  { name:"Utility PPA", type:"Power sale contract", covers:"62%", exp:"2031-12-31", settle:"Contract price", realized:"PPA price", basis:"n/a", cp:"Midcontinent IOU", collat:"None", residual:"None on contracted block" },
+  { name:"Fixed-for-float swap", type:"Financial hedge", covers:"28%", exp:"2027-10-31", settle:"SP-15", realized:"Project busbar", basis:"+$2.40/MWh", cp:"Bank A- ", collat:"$1.2mm IM", residual:"Basis + shape + volume" },
+  { name:"Unhedged merchant tail", type:"Open", covers:"10% now / 38% after 2027", exp:"—", settle:"Spot", realized:"Spot", basis:"full", cp:"—", collat:"—", residual:"Price, volume, basis, shape" }
+];
+
+function money(n){ return n==null?"—":"$"+n.toLocaleString(); }
+function col(kind){ return kind==="missing"? "var(--miss)": kind==="change"? "var(--hi)": "var(--mid)"; }
+
+function tiles(){
+  return `<div class="tiles">
+    <div class="tile"><div class="k">Material changes</div><div class="v" style="color:var(--hi)">3</div><div class="d">Basis widened · generation light · DSCR 1.18</div></div>
+    <div class="tile"><div class="k">Potential financial impact</div><div class="v">$0.9–1.4mm</div><div class="d">Next 12 months, residual after current hedges</div></div>
+    <div class="tile"><div class="k">Existing protection</div><div class="v">90% / 62%</div><div class="d">Energy covered now / still covered after Oct 2027</div></div>
+    <div class="tile"><div class="k">Items requiring review</div><div class="v" style="color:var(--mid)">4</div><div class="d">Hedge roll · CP watch · DSCR lock-up · stale insurance</div></div>
+  </div>`;
+}
+
+function overview(){
+  return tiles() + `<div class="grid">
+    <div class="card">
+      <h2>What needs a look — not a score dump</h2>
+      ${ALERTS.map(a => `<div class="alert" data-id="${a.id}">
+        <div class="tag" style="color:${col(a.kind)}">${a.stale?"Missing data":a.kind==="change"?"Changed":"Review"}</div>
+        <div><b>${a.title}</b><div class="sub">${a.impact}</div></div>
+        <div class="sub">${a.asOf}</div>
+      </div>`).join("")}
+    </div>
+    <div class="card">
+      <h2>Exposure before / after hedge</h2>
+      <div style="padding:14px 16px 6px" class="sub">Gross merchant energy vs what is still floating after PPA + swap. LNG or coal prices are not treated as a hedge unless the cash-flow link is shown under stress — it is not shown here, so they are not counted.</div>
+      <div style="padding:8px 16px 4px" class="sub">Now</div>
+      <div class="bar" style="margin:0 16px 10px"><span style="width:62%;background:#34d399"></span><span style="width:28%;background:#60a5fa"></span><span style="width:10%;background:#f97316"></span></div>
+      <div style="padding:0 16px 4px" class="sub">After Oct 2027 (swap expires)</div>
+      <div class="bar" style="margin:0 16px 12px"><span style="width:62%;background:#34d399"></span><span style="width:38%;background:#f97316"></span></div>
+      <div class="note">Green PPA · blue swap · orange still exposed. The orange bar is the surveillance object.</div>
+    </div>
+  </div>`;
+}
+
+function protect(){
+  return `<div class="card">
+    <h2>Hedge register — coverage, expiry, basis, counterparty, collateral</h2>
+    <table>
+      <tr><th>Instrument</th><th>Type</th><th>Coverage</th><th>Expires</th><th>Settle vs realized</th><th>Counterparty</th><th>Collateral</th><th>What remains exposed</th></tr>
+      ${HEDGES.map(h=>`<tr>
+        <td>${h.name}</td><td>${h.type}</td><td>${h.covers}</td><td>${h.exp}</td>
+        <td>${h.settle} → ${h.realized}${h.basis!=="n/a"?" ("+h.basis+")":""}</td>
+        <td>${h.cp}</td><td>${h.collat}</td><td>${h.residual}</td>
+      </tr>`).join("")}
+    </table>
+    <p class="note">A second energy commodity is not booked as protection unless it has a tested relationship to this project's cash flows, including a stress path. That test is not on file for LNG or coal, so they do not reduce the orange residual.</p>
+  </div>`;
+}
+
+function cats(){
+  const rows = [
+    ["Character","Low","No integrity or media flags"],
+    ["Legal & claims","Moderate","No surety claim; ordinary vendor file"],
+    ["Capacity","Elevated","Weather-adjusted generation 7% light"],
+    ["Capital","Elevated","Forward DSCR 1.18 vs 1.20 lock-up"],
+    ["Credit","Elevated","Swap CP watch; basis cost up"],
+    ["Collateral","Missing","Insurance cert >120 days old"],
+    ["Conditions","Elevated","Swap expiry leaves 38% floating"]
+  ];
+  return `<div class="card">
+    <h2>Category roll-up (MAX child, not average)</h2>
+    <table><tr><th>Category</th><th>Status</th><th>What is driving it</th></tr>
+    ${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("")}
+    </table>
+    <p class="note">Hub is Elevated because several children are Elevated and one is Missing. Missing is not drawn as Low.</p>
+  </div>`;
+}
+
+function charts(){
+  return `<div class="grid">
+    <div class="card">
+      <h2>Generation vs weather-adjusted plan</h2>
+      <div class="spark">${[101,98,99,96,94,93].map(v=>`<i style="height:${v-80}%"></i>`).join("")}</div>
+      <p class="note">Used selectively. Limits not trusted until seasonality is stripped and the new inverter-derate volatility is in the band. This is a statistical warning, not the DSCR covenant.</p>
+    </div>
+    <div class="card">
+      <h2>Contractual threshold — DSCR</h2>
+      <div class="spark">${[1.41,1.36,1.31,1.27,1.22,1.19].map(v=>`<i style="height:${(v-1)*80}%"></i>`).join("")}</div>
+      <p class="note">Lock-up 1.20 (amber) · default 1.05 (red). Different response from the generation chart: lock-up changes distributions, it does not mean the control chart failed.</p>
+    </div>
+  </div>`;
+}
+
+function openAlert(id){
+  const a = ALERTS.find(x=>x.id===id);
+  document.getElementById("modalTitle").textContent = a.title;
+  document.getElementById("modalSub").textContent = `${a.asOf} · ${a.stale?"Data missing":"Current"} · ${a.type==="contract"?"Contractual threshold":a.type==="missing"?"Freshness rule":"Statistical watch"}`;
+  const spark = a.trend.length? `<div class="spark">${a.trend.map((v,i)=>{
+    const max=Math.max(...a.trend), min=Math.min(...a.trend);
+    const h = 12+((v-min)/(max-min||1))*44;
+    return `<i style="height:${h}px;background:${a.stale?"#7dd3fc":"#60a5fa"}"></i>`;
+  }).join("")}</div>` : `<p class="note">No series on file — that is the alert.</p>`;
+  document.getElementById("modalBody").innerHTML = `
+    ${spark}
+    <div class="note"><span class="pill">Impact</span> ${a.impact}</div>
+    <div class="note"><span class="pill">Protection in place</span> ${a.protect}</div>
+    <div class="note"><span class="pill">Supporting data</span> ${a.data}</div>
+    <div class="note"><span class="pill">Risk-model branch</span> ${a.branch}</div>
+    <div class="note"><span class="pill">Threshold type</span> ${a.threshold}</div>`;
+  document.getElementById("modalBack").classList.add("open");
+}
+
+const views = { overview, protect, cats, charts };
+function show(tab){
+  document.getElementById("view").innerHTML = views[tab]();
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab===tab));
+  document.querySelectorAll(".alert").forEach(el => el.onclick = () => openAlert(el.dataset.id));
+}
+document.addEventListener("DOMContentLoaded", () => {
+  show("overview");
+  document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => show(b.dataset.tab));
+  document.getElementById("closeModal").onclick = () => document.getElementById("modalBack").classList.remove("open");
+});
+</script>
+</body>
+</html>

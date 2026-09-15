@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Commercial Bond PRA — Category Wheel</title>
+<style>
+  :root {
+    --bg:#0b1020; --panel:#121a30; --panel-2:#18233f; --line:#2a3a62;
+    --text:#e8eefc; --muted:#93a0c2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:#0b1020; color:var(--text); font-family:"Segoe UI",system-ui,sans-serif; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid var(--line); }
+  h1 { font-size:18px; margin:0; }
+  .sub { color:var(--muted); font-size:12px; margin-top:3px; }
+  button, input[type=text] { background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px; }
+  button { cursor:pointer; }
+  button.primary { background:#1d4ed8; border-color:#3b82f6; }
+  .layout { display:grid; grid-template-columns:340px 1fr; height:calc(100% - 62px); }
+  aside { border-right:1px solid var(--line); background:var(--panel); overflow:auto; padding:12px; }
+  .cat { border:1px solid var(--line); border-radius:10px; margin-bottom:8px; overflow:hidden; }
+  .cat-h { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; cursor:pointer; }
+  .cat-h b { font-size:13px; }
+  .kids { display:none; padding:4px 8px 8px; }
+  .cat.open .kids { display:block; }
+  .kid { display:grid; grid-template-columns:1fr 52px 44px; gap:6px; align-items:center; padding:4px 0; border-top:1px solid #1c2744; font-size:12px; }
+  .pill { font-size:10px; letter-spacing:.04em; text-transform:uppercase; }
+  main { position:relative; overflow:hidden; }
+  svg { width:100%; height:100%; display:block; }
+  .hint { position:absolute; left:16px; bottom:12px; color:var(--muted); font-size:12px; max-width:70%; }
+  .modal-back { position:fixed; inset:0; background:#040812b8; display:none; align-items:center; justify-content:center; z-index:20; }
+  .modal-back.open { display:flex; }
+  .modal { width:min(920px,94vw); max-height:90vh; overflow:auto; background:#10182c; border:1px solid var(--line); border-radius:14px; }
+  .modal header { position:sticky; top:0; background:#10182c; }
+  .node { border:1px solid var(--line); border-radius:10px; padding:8px 12px; background:var(--panel-2); min-width:150px; text-align:center; font-size:13px; }
+  .row { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin:8px 0 14px; }
+  .col { display:flex; flex-direction:column; align-items:center; }
+  .gate { font-size:10px; color:var(--muted); margin:6px 0; text-transform:uppercase; }
+  .meta { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 16px; }
+  .kpi { background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
+  .kpi b { display:block; font-size:16px; }
+  .kpi span { color:var(--muted); font-size:11px; }
+  .child-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; padding:0 16px 16px; }
+  .child-card { border:1px solid var(--line); border-radius:10px; padding:10px; cursor:pointer; background:var(--panel-2); }
+  .child-card:hover { border-color:#4b63a8; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Commercial Bond PRA — 7-category wheel</h1>
+    <div class="sub">Hub = worst category · category = worst child node · click a spoke to open nodes · click a node for its PRA tree</div>
+    <div class="sub" style="margin-top:6px"><a href="index.html" style="color:#93c5fd">Review desk</a> · <a href="category.html" style="color:#93c5fd">7-category wheel</a> · <a href="factors.html" style="color:#93c5fd">28-factor wheel</a></div>
+  </div>
+  <div>
+    <button id="randomBtn">Sample scores</button>
+    <button id="resetBtn">Reset mid</button>
+    <button class="primary" id="exportBtn">Download JSON</button>
+  </div>
+</header>
+<div class="layout"></div>
+<script>
+const CATEGORIES = [
+  { id:"character", name:"Character", blurb:"Integrity, ownership, reputation" },
+  { id:"legal", name:"Legal & claims", blurb:"Claims, suits, liens, insolvency" },
+  { id:"capacity", name:"Capacity", blurb:"Ability to perform the obligation" },
+  { id:"capital", name:"Capital", blurb:"Statements, liquidity, leverage, tax" },
+  { id:"credit", name:"Credit", blurb:"Trade pay and bureau scores" },
+  { id:"collateral", name:"Collateral", blurb:"Pledged assets and indemnity" },
+  { id:"conditions", name:"Conditions", blurb:"Macro, form, concentration, cadence" }
+];
+
+const FACTORS = [
+  { id:"integrity", name:"Management integrity / ownership", cat:"character", scope:"General", assess:"Integrity issues, ownership changes, key-person departures.", sources:["SoS filings","KYC / media","Field reports"] },
+  { id:"media", name:"Reputation and adverse media", cat:"character", scope:"General", assess:"Public reputation hits that foreshadow claims or flight.", sources:["News wires","Media scans","Complaint sites"] },
+  { id:"claims", name:"Bond claims history", cat:"legal", scope:"Specific", assess:"Prior and current claims, reserves, recoveries.", sources:["Loss runs","Obligee notices","Prior-surety runs"] },
+  { id:"suits", name:"Lawsuits, judgments, liens", cat:"legal", scope:"General", assess:"Litigation, judgments, recorded liens.", sources:["PACER","County indexes","Westlaw"] },
+  { id:"taxucc", name:"Tax liens and UCC filings", cat:"legal", scope:"General", assess:"Tax liens and Article 9 filings.", sources:["IRS/state liens","SoS UCC","County tax liens"] },
+  { id:"bk", name:"Bankruptcy and insolvency", cat:"legal", scope:"General", assess:"Ch. 7/11/13, receivership, ABC.", sources:["PACER BK","Bureau flags","Receivership notices"] },
+  { id:"perform", name:"Ability to perform", cat:"capacity", scope:"Specific", assess:"Still licensed and operating in the bonded line.", sources:["License status","Site check","Producer"] },
+  { id:"experience", name:"Experience in the bonded line", cat:"capacity", scope:"Specific", assess:"Track record in the bonded activity.", sources:["Application","Prior-surety files","References"] },
+  { id:"ops", name:"Operational stability", cat:"capacity", scope:"General", assess:"Staffing, systems, locations.", sources:["Footnotes","Field inspection","Interview"] },
+  { id:"continuity", name:"Management / ownership continuity", cat:"capacity", scope:"General", assess:"Key-person and control continuity.", sources:["Ownership records","Key-man files","Succession"] },
+  { id:"license", name:"License / regulatory status", cat:"capacity", scope:"Specific", assess:"Suspensions, revocations, consent orders.", sources:["Licensing boards","Consent orders","Regulator notices"] },
+  { id:"compliance", name:"Statutory / contract compliance", cat:"capacity", scope:"Specific", assess:"Ongoing compliance with the rule that required the bond.", sources:["Obligee notices","Audits","Statute/permit"] },
+  { id:"stmts", name:"Financial statements", cat:"capital", scope:"General", assess:"Statement quality and timeliness.", sources:["CPA package","EDGAR","Comfort letters"] },
+  { id:"liquidity", name:"Working capital and liquidity", cat:"capital", scope:"General", assess:"Current ratio and cash.", sources:["Interims","Bank statements","Bureau liquidity"] },
+  { id:"profit", name:"Profitability and cash flow", cat:"capital", scope:"General", assess:"Earnings and cash conversion.", sources:["Income stmt","Cash flow","Tax returns"] },
+  { id:"leverage", name:"Leverage and debt service", cat:"capital", scope:"General", assess:"Debt load and coverage.", sources:["Debt schedules","Credit agreements","Bureau"] },
+  { id:"taxret", name:"Tax returns / tax compliance", cat:"capital", scope:"General", assess:"Filing status and tax liabilities.", sources:["Business returns","Personal returns","Transcripts"] },
+  { id:"distress", name:"Public-record distress signals", cat:"capital", scope:"General", assess:"Deterioration vs underwriting in public records.", sources:["Bureau public records","D&B stress","News/court"] },
+  { id:"trade", name:"Vendor and trade payment", cat:"credit", scope:"General", assess:"Pays suppliers on time.", sources:["PAYDEX","NACM","Trade references"] },
+  { id:"bizcredit", name:"Business credit scores", cat:"credit", scope:"General", assess:"Commercial bureau scores.", sources:["D&B","Experian Biz","Equifax Commercial"] },
+  { id:"perscredit", name:"Personal credit of indemnitors", cat:"credit", scope:"General", assess:"Consumer-bureau condition of indemnitors.", sources:["Experian","Equifax","TransUnion"] },
+  { id:"collateral", name:"Pledged collateral", cat:"collateral", scope:"Specific", assess:"Existence, perfection, current value.", sources:["Custodian","Appraisals","UCC-1"] },
+  { id:"indemnity", name:"Indemnity still in force", cat:"collateral", scope:"Specific", assess:"GAI still binding and collectible.", sources:["GAI file","Counsel","Authority docs"] },
+  { id:"guarantor", name:"Guarantor financial condition", cat:"collateral", scope:"General", assess:"Indemnitor net worth and collectability.", sources:["PFS","Bureaus","Tax returns"] },
+  { id:"macro", name:"Industry and macro conditions", cat:"conditions", scope:"General", assess:"Cycle, prime, unemployment, unrest, politics.", sources:["BLS/Fed","Industry data","Political notes"] },
+  { id:"bondform", name:"Bond form / obligation changes", cat:"conditions", scope:"Specific", assess:"Hazardous clauses and form revisions.", sources:["Bond file","Obligee forms","SFAA"] },
+  { id:"concentration", name:"Exposure concentration", cat:"conditions", scope:"General", assess:"Single-name, industry, or geo clusters.", sources:["Exposure reports","Producer reports","Geo maps"] },
+  { id:"cadence", name:"Monitoring cadence vs quality", cat:"conditions", scope:"General", assess:"Review frequency vs residual risk.", sources:["Calendar","Rating policy","Exception logs"] }
+];
+
+const state = {
+  investment: "Subject commercial bond / principal",
+  scores: Object.fromEntries(FACTORS.map(f => [f.id, 5]))
+};
+
+function riskColor(s){ return s<=3?"#34d399":s<=5?"#fbbf24":s<=7?"#f97316":"#ef4444"; }
+function riskLabel(s){ return s<=3?"Low":s<=5?"Moderate":s<=7?"Elevated":"Critical"; }
+function thickness(s){ return 2.2 + (s/10)*8; }
+function kids(cat){ return FACTORS.filter(f => f.cat===cat); }
+function catScore(cat){ return Math.max(...kids(cat).map(f => state.scores[f.id])); }
+function hubScore(){ return Math.max(...CATEGORIES.map(c => catScore(c.id))); }
+function worstChild(cat){ return kids(cat).slice().sort((a,b)=>state.scores[b.id]-state.scores[a.id])[0]; }
+
+function treeFor(f){
+  return {
+    top: f.name + " impairs recoverability of the bonded obligation",
+    ands: [
+      { title:"Condition deteriorates", leaves:[f.assess,"Change is material vs underwriting","Signal confirmed"] },
+      { title:"Surveillance gap", leaves:["Source stale or missing","No timely escalation","No residual mitigation"] }
+    ],
+    ors: [
+      { title:"Loss path", leaves:["Claim / forfeiture","Uncollectible indemnity","Reserve / capital hit"] },
+      { title:"Book path", leaves:["Category rolls to worse band","Hub shows this condition","Capacity cut"] }
+    ],
+    notes: "Sources: " + f.sources.join(" · ") + " · Scope: " + f.scope
+  };
+}
+
+function renderSidebar(){
+  const el = document.getElementById("sidebar");
+  el.innerHTML = `<label class="sub">Hub (investment)</label>
+    <input id="invName" type="text" value="${state.investment}" style="width:100%;margin:6px 0 12px">
+    <div class="sub" style="margin-bottom:8px">Category status = worst child · hub = worst category</div>` +
+    CATEGORIES.map(c => {
+      const s = catScore(c.id);
+      const w = worstChild(c.id);
+      return `<div class="cat" data-cat="${c.id}">
+        <div class="cat-h" data-cat="${c.id}">
+          <div><b>${c.name}</b><div class="sub">${c.blurb}</div></div>
+          <div style="text-align:right"><div class="pill" style="color:${riskColor(s)}">${riskLabel(s)}</div>
+          <div style="color:${riskColor(s)};font-variant-numeric:tabular-nums">${s}</div></div>
+        </div>
+        <div class="kids">${kids(c.id).map(f => `
+          <div class="kid">
+            <div title="${f.scope}">${f.name}</div>
+            <input type="range" min="1" max="10" value="${state.scores[f.id]}" data-id="${f.id}">
+            <div style="color:${riskColor(state.scores[f.id])};text-align:right">${state.scores[f.id]} ${riskLabel(state.scores[f.id]).slice(0,3)}</div>
+          </div>`).join("")}
+          <div class="sub">Driver: ${w.name}</div>
+        </div>
+      </div>`;
+    }).join("");
+  el.querySelector("#invName").oninput = e => { state.investment = e.target.value || "Subject"; draw(); };
+  el.querySelectorAll("input[type=range]").forEach(r => r.oninput = e => {
+    state.scores[e.target.dataset.id] = +e.target.value; renderSidebar(); draw();
+  });
+  el.querySelectorAll(".cat-h").forEach(h => h.onclick = () => {
+    h.parentElement.classList.toggle("open");
+    openCategory(h.dataset.cat);
+  });
+}
+
+function draw(){
+  const svg = document.getElementById("wheel");
+  const W = svg.clientWidth || 900, H = svg.clientHeight || 700;
+  const cx = W/2, cy = H/2, R = Math.min(W,H)*0.34, n = CATEGORIES.length;
+  const hub = hubScore();
+  let spokes="", nodes="", labels="";
+  CATEGORIES.forEach((c,i) => {
+    const ang = -Math.PI/2 + (i/n)*Math.PI*2;
+    const x = cx + Math.cos(ang)*R, y = cy + Math.sin(ang)*R;
+    const s = catScore(c.id), col = riskColor(s);
+    spokes += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${col}" stroke-width="${thickness(s)}" stroke-linecap="round"/>`;
+    nodes += `<circle class="cat-node" data-cat="${c.id}" cx="${x}" cy="${y}" r="${12+s*0.9}" fill="${col}" stroke="#0b1020" stroke-width="2" style="cursor:pointer"/>`;
+    const lx = cx + Math.cos(ang)*(R+42), ly = cy + Math.sin(ang)*(R+42);
+    const anchor = Math.cos(ang)>0.2?"start":Math.cos(ang)<-0.2?"end":"middle";
+    const w = worstChild(c.id);
+    labels += `<text class="cat-node" data-cat="${c.id}" x="${lx}" y="${ly}" text-anchor="${anchor}" fill="#e8eefc" font-size="13" font-weight="600" style="cursor:pointer">${c.name}</text>
+      <text class="cat-node" data-cat="${c.id}" x="${lx}" y="${ly+14}" text-anchor="${anchor}" fill="${col}" font-size="11" style="cursor:pointer">${riskLabel(s)} ${s} · ${w.name}</text>`;
+  });
+  const worstCat = CATEGORIES.slice().sort((a,b)=>catScore(b.id)-catScore(a.id))[0];
+  svg.innerHTML = spokes +
+    `<circle cx="${cx}" cy="${cy}" r="64" fill="#1e3a5f" stroke="${riskColor(hub)}" stroke-width="5"/>
+     <text x="${cx}" y="${cy-16}" text-anchor="middle" fill="#7dd3fc" font-size="11">HUB = WORST CATEGORY</text>
+     <text x="${cx}" y="${cy+2}" text-anchor="middle" fill="#e8eefc" font-size="12">${escapeXml((state.investment||"").slice(0,22))}</text>
+     <text x="${cx}" y="${cy+20}" text-anchor="middle" fill="${riskColor(hub)}" font-size="13" font-weight="600">${riskLabel(hub)} ${hub}</text>
+     <text x="${cx}" y="${cy+36}" text-anchor="middle" fill="#93a0c2" font-size="10">${worstCat.name}</text>` + nodes + labels;
+  svg.querySelectorAll(".cat-node").forEach(el => el.onclick = () => openCategory(el.dataset.cat));
+}
+
+function escapeXml(s){ return String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+function openCategory(catId){
+  const c = CATEGORIES.find(x => x.id===catId);
+  const s = catScore(catId);
+  document.getElementById("modalTitle").textContent = c.name;
+  document.getElementById("modalSub").textContent = `${state.investment} · category ${riskLabel(s)} ${s} (worst child) · ${c.blurb}`;
+  document.getElementById("modalBody").innerHTML = `
+    <div class="meta">
+      <div class="kpi"><span>Category status</span><b style="color:${riskColor(s)}">${riskLabel(s)} ${s}</b></div>
+      <div class="kpi"><span>Roll-up</span><b>MAX child</b></div>
+      <div class="kpi"><span>Nodes</span><b>${kids(catId).length}</b></div>
+      <div class="kpi"><span>Driver</span><b>${worstChild(catId).name}</b></div>
+    </div>
+    <div class="child-grid">${kids(catId).map(f => {
+      const sc = state.scores[f.id];
+      return `<div class="child-card" data-id="${f.id}">
+        <div class="pill" style="color:${riskColor(sc)}">${riskLabel(sc)} ${sc}</div>
+        <div style="font-weight:600;margin:4px 0">${f.name}</div>
+        <div class="sub">${f.scope} · ${f.assess}</div>
+      </div>`;
+    }).join("")}</div>`;
+  document.getElementById("modalBack").classList.add("open");
+  document.querySelectorAll(".child-card").forEach(card => card.onclick = () => openTree(card.dataset.id));
+}
+
+function openTree(id){
+  const f = FACTORS.find(x => x.id===id);
+  const t = treeFor(f);
+  const s = state.scores[id];
+  const cat = CATEGORIES.find(c => c.id===f.cat);
+  document.getElementById("modalTitle").textContent = "PRA tree · " + f.name;
+  document.getElementById("modalSub").textContent = `${state.investment} · ${s}/10 ${riskLabel(s)} · ${cat.name} · ${f.scope}`;
+  document.getElementById("modalBody").innerHTML = `
+    <div class="meta">
+      <div class="kpi"><span>Node</span><b style="color:${riskColor(s)}">${riskLabel(s)} ${s}</b></div>
+      <div class="kpi"><span>Category after this node</span><b style="color:${riskColor(catScore(f.cat))}">${riskLabel(catScore(f.cat))} ${catScore(f.cat)}</b></div>
+      <div class="kpi"><span>Hub after this node</span><b style="color:${riskColor(hubScore())}">${riskLabel(hubScore())} ${hubScore()}</b></div>
+      <div class="kpi"><span>Scope</span><b>${f.scope}</b></div>
+    </div>
+    <div style="text-align:center;padding-bottom:18px">
+      <div class="node">${t.top}</div>
+      <div class="gate">AND</div>
+      <div class="row">${t.ands.map(b=>`<div class="col"><div class="node">${b.title}</div><div class="gate">OR</div>${b.leaves.map(l=>`<div class="node" style="margin:4px 0">${l}</div>`).join("")}</div>`).join("")}</div>
+      <div class="gate">OR</div>
+      <div class="row">${t.ors.map(b=>`<div class="col"><div class="node">${b.title}</div>${b.leaves.map(l=>`<div class="node" style="margin:4px 0">${l}</div>`).join("")}</div>`).join("")}</div>
+      <p class="sub" style="max-width:640px;margin:12px auto">${t.notes}</p>
+      <p><button id="backCat">Back to ${cat.name}</button></p>
+    </div>`;
+  document.getElementById("backCat").onclick = () => openCategory(f.cat);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelector(".layout").innerHTML = `
+    <aside id="sidebar"></aside>
+    <main>
+      <svg id="wheel"></svg>
+      <div class="hint">Seven spokes only. Click a spoke for its nodes and status. Node condition rolls up with MAX, not average — one Critical child turns the category and the hub Critical.</div>
+    </main>
+    <div class="modal-back" id="modalBack">
+      <div class="modal">
+        <header>
+          <div><h1 id="modalTitle">Category</h1><div class="sub" id="modalSub"></div></div>
+          <button id="closeModal">Close</button>
+        </header>
+        <div id="modalBody"></div>
+      </div>
+    </div>`;
+  renderSidebar(); draw();
+  addEventListener("resize", draw);
+  document.getElementById("closeModal").onclick = () => document.getElementById("modalBack").classList.remove("open");
+  document.getElementById("randomBtn").onclick = () => { FACTORS.forEach(f => state.scores[f.id] = 1+Math.floor(Math.random()*10)); renderSidebar(); draw(); };
+  document.getElementById("resetBtn").onclick = () => { FACTORS.forEach(f => state.scores[f.id] = 5); renderSidebar(); draw(); };
+  document.getElementById("exportBtn").onclick = () => {
+    const payload = {
+      investment: state.investment,
+      hub: { score: hubScore(), band: riskLabel(hubScore()) },
+      categories: CATEGORIES.map(c => ({ id:c.id, score:catScore(c.id), band:riskLabel(catScore(c.id)), driver:worstChild(c.id).id })),
+      scores: state.scores
+    };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)]));
+    a.download = "pra-category-scores.json"; a.click();
+  };
+});
+</script>
+</body>
+</html>

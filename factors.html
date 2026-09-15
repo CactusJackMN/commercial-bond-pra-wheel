@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Commercial Bond PRA Wheel — 28 Surveillance Factors</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121a30;
+    --panel-2: #18233f;
+    --line: #2a3a62;
+    --text: #e8eefc;
+    --muted: #93a0c2;
+    --hub: #7dd3fc;
+    --low: #34d399;
+    --mid: #fbbf24;
+    --high: #f97316;
+    --crit: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: radial-gradient(1200px 700px at 50% 20%, #152044 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 22px; border-bottom: 1px solid var(--line);
+    background: rgba(11,16,32,.8); backdrop-filter: blur(8px);
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .04em; }
+  header .sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .actions { display: flex; gap: 8px; align-items: center; }
+  button, select, input[type="text"] {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 13px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: #4b63a8; }
+  button.primary { background: #1d4ed8; border-color: #3b82f6; }
+  .layout { display: grid; grid-template-columns: 320px 1fr; height: calc(100% - 64px); }
+  aside {
+    border-right: 1px solid var(--line);
+    background: var(--panel);
+    overflow: auto; padding: 12px;
+  }
+  .invest-box { margin-bottom: 12px; }
+  .invest-box label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .legend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin: 8px 0 12px; }
+  .swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .factor {
+    display: grid; grid-template-columns: 28px 1fr 44px;
+    gap: 8px; align-items: center;
+    padding: 6px 4px; border-bottom: 1px solid #1c2744;
+  }
+  .factor .idx { font-size: 11px; color: var(--muted); }
+  .factor .name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .factor input[type="range"] { width: 100%; }
+  .score { font-variant-numeric: tabular-nums; font-size: 12px; text-align: right; }
+  main { position: relative; overflow: hidden; }
+  svg { width: 100%; height: 100%; display: block; }
+  .hint {
+    position: absolute; left: 16px; bottom: 14px;
+    color: var(--muted); font-size: 12px;
+  }
+  .modal-back {
+    position: fixed; inset: 0; background: rgba(4,8,18,.72);
+    display: none; align-items: center; justify-content: center; z-index: 20;
+  }
+  .modal-back.open { display: flex; }
+  .modal {
+    width: min(980px, 94vw); max-height: 90vh; overflow: auto;
+    background: #10182c; border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  }
+  .modal header { position: sticky; top: 0; }
+  .modal .body { padding: 16px 20px 24px; }
+  .tree { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .node {
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px;
+    background: var(--panel-2); min-width: 160px; text-align: center;
+    font-size: 13px;
+  }
+  .node.top { border-color: #38bdf8; box-shadow: 0 0 0 1px rgba(56,189,248,.25); }
+  .node.and { border-color: #f59e0b; }
+  .node.or { border-color: #22c55e; }
+  .node.leaf { border-color: #64748b; font-size: 12px; color: #dbe4ff; }
+  .gate {
+    font-size: 10px; letter-spacing: .08em; color: var(--muted);
+    margin: 6px 0; text-transform: uppercase;
+  }
+  .row { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin: 8px 0 16px; }
+  .col { display: flex; flex-direction: column; align-items: center; }
+  .vline { width: 2px; height: 16px; background: #33466f; }
+  .meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0 18px; }
+  .kpi { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .kpi b { display: block; font-size: 18px; }
+  .kpi span { color: var(--muted); font-size: 11px; }
+  textarea {
+    width: 100%; min-height: 70px; background: #0c1426; color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-family: inherit;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: 240px 1fr; }
+    aside { border-right: none; border-bottom: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Commercial Bond PRA Wheel</h1>
+    <div class="sub">28 surveillance factors from the 3 Cs-plus framework · spoke color/thickness = residual risk · click a node for that factor’s PRA tree</div>
+    <div class="sub" style="margin-top:6px"><a href="index.html" style="color:#93c5fd">Review desk</a> · <a href="category.html" style="color:#93c5fd">7-category wheel</a> · <a href="factors.html" style="color:#93c5fd">28-factor wheel</a></div>
+  </div>
+  <div class="actions">
+    <button id="randomBtn">Sample scores</button>
+    <button id="resetBtn">Reset mid</button>
+    <button class="primary" id="exportBtn">Download JSON</button>
+  </div>
+</header>
+<div class="layout"></div>
+
+<script>
+const FACTORS = [
+  { id:"claims", name:"Bond claims history", group:"Character", scope:"Specific",
+    assess:"Prior and current claims, reserves, recoveries, pattern of obligee demands.",
+    sources:["Internal loss runs","Obligee demand letters","Prior-surety loss runs"] },
+  { id:"suits", name:"Lawsuits, judgments, liens", group:"Character", scope:"General",
+    assess:"Pending or historical civil litigation, money judgments, recorded liens.",
+    sources:["PACER / state dockets","County judgment indexes","LexisNexis / Westlaw"] },
+  { id:"taxucc", name:"Tax liens and UCC filings", group:"Character", scope:"General",
+    assess:"Federal/state tax liens and Article 9 filings signaling distress or competing claims.",
+    sources:["IRS / state tax-lien indexes","Secretary of State UCC search","County tax-lien records"] },
+  { id:"bk", name:"Bankruptcy and insolvency", group:"Character", scope:"General",
+    assess:"Ch. 7/11/13, receivership, ABC, or informal workout.",
+    sources:["PACER bankruptcy","Bureau bankruptcy flags","Receivership notices"] },
+  { id:"trade", name:"Vendor and trade payment history", group:"Character", scope:"General",
+    assess:"Whether the principal pays suppliers, lessors, and other trade creditors on time.",
+    sources:["D&B PAYDEX","NACM credit groups","Direct trade references"] },
+  { id:"integrity", name:"Management integrity / ownership change", group:"Character", scope:"General",
+    assess:"Integrity issues, ownership changes, key-person departures.",
+    sources:["Secretary of State filings","Adverse media / KYC","Producer and field reports"] },
+  { id:"license", name:"Regulatory actions and license status", group:"Character", scope:"Specific",
+    assess:"Suspensions, revocations, consent orders, ethical or compliance violations.",
+    sources:["Licensing board lookups","Consent-order databases","Obligee / regulator notices"] },
+  { id:"media", name:"Reputation and adverse media", group:"Character", scope:"General",
+    assess:"Public reputation hits that foreshadow claims or flight risk.",
+    sources:["News wires","Google / specialist media scans","Social and complaint sites"] },
+  { id:"perform", name:"Ability to perform the obligation", group:"Capacity", scope:"Specific",
+    assess:"License still valid; business still operating in the bonded line.",
+    sources:["License status","Site / operations check","Producer confirmation"] },
+  { id:"experience", name:"Experience in the bonded line", group:"Capacity", scope:"Specific",
+    assess:"Track record in the activity the bond covers.",
+    sources:["Application / resume of work","Prior-surety files","Industry references"] },
+  { id:"ops", name:"Operational stability", group:"Capacity", scope:"General",
+    assess:"Staffing, systems, locations remain adequate to perform.",
+    sources:["Financial footnotes","Field inspection","Management interview"] },
+  { id:"continuity", name:"Continuity of management / ownership", group:"Capacity", scope:"General",
+    assess:"Key-person and control continuity after issuance.",
+    sources:["Ownership records","Key-man insurance files","Succession documents"] },
+  { id:"compliance", name:"Statutory / permit / contract compliance", group:"Capacity", scope:"Specific",
+    assess:"Ongoing compliance with the rule or contract that required the bond.",
+    sources:["Obligee compliance notices","Audit or inspection reports","Statute / permit text"] },
+  { id:"stmts", name:"Financial statements", group:"Capital", scope:"General",
+    assess:"Balance sheet, income statement, cash flow quality and timeliness.",
+    sources:["CPA package","EDGAR 10-K/10-Q if public","Bank / CPA comfort letters"] },
+  { id:"liquidity", name:"Working capital and liquidity", group:"Capital", scope:"General",
+    assess:"Current ratio, cash, ability to meet near-term claims or penalties.",
+    sources:["Interim financials","Bank statements / revolver reports","Bureau liquidity scores"] },
+  { id:"profit", name:"Profitability and cash-flow trends", group:"Capital", scope:"General",
+    assess:"Earnings quality and cash conversion versus original underwriting.",
+    sources:["Income statements","Cash-flow statements","Tax returns"] },
+  { id:"leverage", name:"Leverage and debt service", group:"Capital", scope:"General",
+    assess:"Debt load and coverage; refinancing pressure.",
+    sources:["Debt schedules","Credit agreements","Bureau leverage metrics"] },
+  { id:"bizcredit", name:"Business credit scores", group:"Capital", scope:"General",
+    assess:"Commercial bureau scores and trade-tape deterioration.",
+    sources:["D&B","Experian Business","Equifax Commercial"] },
+  { id:"perscredit", name:"Personal credit of owners / indemnitors", group:"Capital", scope:"General",
+    assess:"Consumer-bureau condition of people behind the indemnity.",
+    sources:["Experian","Equifax","TransUnion"] },
+  { id:"taxret", name:"Tax returns and tax-compliance status", group:"Capital", scope:"General",
+    assess:"Filing status, large liabilities, mismatch vs. book income.",
+    sources:["Business tax returns","Personal returns of indemnitors","IRS / state transcripts"] },
+  { id:"distress", name:"Public-record financial distress signals", group:"Capital", scope:"General",
+    assess:"Material deterioration vs. original underwriting in public records.",
+    sources:["Bureau public-record segments","D&B stress alerts","News / court flags"] },
+  { id:"collateral", name:"Status and value of pledged collateral", group:"Collateral", scope:"Specific",
+    assess:"Existence, perfection, and current value of pledged assets.",
+    sources:["Custodian / control agreements","Appraisals","UCC-1 continuation search"] },
+  { id:"indemnity", name:"Indemnity agreements still in force", group:"Collateral", scope:"Specific",
+    assess:"GAI still binding and collectible; no release or defective execution.",
+    sources:["Executed GAI file","Counsel review","Corporate authority docs"] },
+  { id:"guarantor", name:"Personal guarantor financial condition", group:"Collateral", scope:"General",
+    assess:"Indemnitor net worth, liquidity, and collectability.",
+    sources:["Personal financial statements","Consumer bureaus","Tax returns"] },
+  { id:"macro", name:"Industry and macroeconomic conditions", group:"Conditions", scope:"General",
+    assess:"Cycle, prime/credit conditions, unemployment, sector policy, unrest/politics if they hit the line.",
+    sources:["BLS / Fed / Treasury series","Industry association data","Regional news and political risk notes"] },
+  { id:"bondform", name:"Bond-form and obligation changes", group:"Conditions", scope:"Specific",
+    assess:"Hazardous clauses, rating triggers, forfeiture language, form revisions.",
+    sources:["Bond file / rider log","Obligee form updates","Counsel / SFAA form notes"] },
+  { id:"concentration", name:"Exposure concentration", group:"Conditions", scope:"General",
+    assess:"Large single names, industry or geographic clusters in the book.",
+    sources:["Internal exposure reports","Producer production reports","Industry/geo maps"] },
+  { id:"cadence", name:"Monitoring cadence vs. credit quality", group:"Conditions", scope:"General",
+    assess:"Whether review frequency still matches residual risk.",
+    sources:["Surveillance calendar","Risk-rating policy","Exception / overdue logs"] }
+];
+
+function treeFor(f) {
+  return {
+    top: f.name + " impairs recoverability of the bonded obligation",
+    ands: [
+      { title: "Condition deteriorates", leaves: [f.assess, "Change is material vs. underwriting", "Signal is confirmed, not a one-off"] },
+      { title: "Surveillance / control gap", leaves: ["Source channel stale or missing", "No timely escalation", "No residual mitigation (rate, collateral, cancel)"] }
+    ],
+    ors: [
+      { title: "Loss path", leaves: ["Claim / forfeiture on this bond", "Uncollectible indemnity", "Reserve or capital hit"] },
+      { title: "Book path", leaves: ["Rating downgrade / tighter terms", "Capacity cut or non-renewal", "Cluster loss if concentrated"] }
+    ],
+    notes: "Primary sources: " + f.sources.join(" · ") + ". Scope: " + f.scope + " (" +
+      (f.scope === "General" ? "principal- or market-level, not tied to one instrument" : "tied to this bond, license/permit/contract, or this collateral/indemnity package") + ")."
+  };
+}
+const TREES = Object.fromEntries(FACTORS.map(f => [f.id, treeFor(f)]));
+
+const state = {
+  investment: "Subject commercial bond / principal",
+  scores: Object.fromEntries(FACTORS.map(f => [f.id, 5]))
+};
+
+function riskColor(s) {
+  if (s <= 3) return getComputedStyle(document.documentElement).getPropertyValue('--low').trim() || '#34d399';
+  if (s <= 5) return '#fbbf24';
+  if (s <= 7) return '#f97316';
+  return '#ef4444';
+}
+function riskLabel(s) {
+  if (s <= 3) return 'Low';
+  if (s <= 5) return 'Moderate';
+  if (s <= 7) return 'Elevated';
+  return 'Critical';
+}
+function thickness(s) { return 1.4 + (s / 10) * 7.5; }
+
+function renderSidebar() {
+  const el = document.getElementById('sidebar');
+  el.innerHTML = `
+    <div class="invest-box">
+      <label>Investment (hub)</label>
+      <input id="invName" type="text" value="${state.investment}" style="width:100%" />
+    </div>
+    <div class="legend">
+      <span><i class="swatch" style="background:#34d399"></i>1–3 low</span>
+      <span><i class="swatch" style="background:#fbbf24"></i>4–5 mod</span>
+      <span><i class="swatch" style="background:#f97316"></i>6–7 elev</span>
+      <span><i class="swatch" style="background:#ef4444"></i>8–10 crit</span>
+    </div>
+    ${FACTORS.map((f,i)=>`
+      <div class="factor">
+        <div class="idx">${String(i+1).padStart(2,'0')}</div>
+        <div>
+          <div class="name" title="${f.group} · ${f.scope}">${f.name}</div>
+          <input type="range" min="1" max="10" value="${state.scores[f.id]}" data-id="${f.id}" />
+        </div>
+        <div class="score" style="color:${riskColor(state.scores[f.id])}">${state.scores[f.id]}</div>
+      </div>`).join('')}
+  `;
+  el.querySelector('#invName').addEventListener('input', e => {
+    state.investment = e.target.value || 'Subject Investment';
+    draw();
+  });
+  el.querySelectorAll('input[type=range]').forEach(r => {
+    r.addEventListener('input', e => {
+      state.scores[e.target.dataset.id] = Number(e.target.value);
+      renderSidebar();
+      draw();
+    });
+  });
+}
+
+function draw() {
+  const svg = document.getElementById('wheel');
+  const W = svg.clientWidth || 900;
+  const H = svg.clientHeight || 700;
+  const cx = W/2, cy = H/2;
+  const R = Math.min(W,H) * 0.36;
+  const n = FACTORS.length;
+  let spokes = '', nodes = '', labels = '';
+  FACTORS.forEach((f,i) => {
+    const ang = -Math.PI/2 + (i/n)*Math.PI*2;
+    const x = cx + Math.cos(ang)*R;
+    const y = cy + Math.sin(ang)*R;
+    const s = state.scores[f.id];
+    const col = riskColor(s);
+    const tw = thickness(s);
+    spokes += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${col}" stroke-width="${tw}" stroke-linecap="round" opacity=".85"/>`;
+    const rNode = 9 + s*0.7;
+    nodes += `<circle class="risk-node" data-id="${f.id}" cx="${x}" cy="${y}" r="${rNode}" fill="${col}" stroke="#0b1020" stroke-width="2" style="cursor:pointer"/>`;
+    const lx = cx + Math.cos(ang)*(R + 36);
+    const ly = cy + Math.sin(ang)*(R + 36);
+    const anchor = Math.cos(ang) > 0.15 ? 'start' : Math.cos(ang) < -0.15 ? 'end' : 'middle';
+    labels += `<text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="#c9d4f0" font-size="11" style="cursor:pointer" class="risk-node" data-id="${f.id}">${i+1}. ${f.name}</text>`;
+  });
+  const agg = FACTORS.reduce((a,f)=>a+state.scores[f.id],0)/n;
+  svg.innerHTML = `
+    <defs>
+      <radialGradient id="hubG">
+        <stop offset="0%" stop-color="#1e3a5f"/>
+        <stop offset="100%" stop-color="#0b1020"/>
+      </radialGradient>
+    </defs>
+    ${spokes}
+    <circle cx="${cx}" cy="${cy}" r="58" fill="url(#hubG)" stroke="${riskColor(agg)}" stroke-width="4"/>
+    <text x="${cx}" y="${cy-8}" text-anchor="middle" fill="#7dd3fc" font-size="12" font-weight="600">BOND / PRINCIPAL</text>
+    <text x="${cx}" y="${cy+10}" text-anchor="middle" fill="#e8eefc" font-size="13">${escapeXml(truncate(state.investment,22))}</text>
+    <text x="${cx}" y="${cy+28}" text-anchor="middle" fill="${riskColor(agg)}" font-size="11">agg ${agg.toFixed(1)} / 10</text>
+    ${nodes}
+    ${labels}
+  `;
+  svg.querySelectorAll('.risk-node').forEach(el => {
+    el.addEventListener('click', () => openTree(el.dataset.id));
+  });
+}
+
+function truncate(s,n){ return s.length>n ? s.slice(0,n-1)+'…' : s; }
+function escapeXml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function openTree(id) {
+  const f = FACTORS.find(x => x.id===id);
+  const t = TREES[id];
+  const s = state.scores[id];
+  const back = document.getElementById('modalBack');
+  document.getElementById('modalTitle').textContent = `PRA tree · ${f.name}`;
+  document.getElementById('modalSub').textContent = `${state.investment} · residual ${s}/10 (${riskLabel(s)}) · ${f.group} · ${f.scope}`;
+  document.getElementById('modalBody').innerHTML = `
+    <div class="meta">
+      <div class="kpi"><span>Residual score</span><b style="color:${riskColor(s)}">${s} / 10</b></div>
+      <div class="kpi"><span>Band</span><b>${riskLabel(s)}</b></div>
+      <div class="kpi"><span>Group</span><b>${f.group}</b></div>
+      <div class="kpi"><span>Logic</span><b>AND then OR</b></div>
+    </div>
+    <div class="tree">
+      <div class="node top">${t.top}</div>
+      <div class="vline"></div>
+      <div class="gate">AND — both families required for loss path</div>
+      <div class="row">
+        ${t.ands.map(b => `
+          <div class="col">
+            <div class="node and">${b.title}</div>
+            <div class="vline"></div>
+            <div class="gate">OR</div>
+            ${b.leaves.map(l => `<div class="node leaf" style="margin:4px 0">${l}</div>`).join('')}
+          </div>`).join('')}
+      </div>
+      <div class="gate">OR — consequence channels</div>
+      <div class="row">
+        ${t.ors.map(b => `
+          <div class="col">
+            <div class="node or">${b.title}</div>
+            <div class="vline"></div>
+            ${b.leaves.map(l => `<div class="node leaf" style="margin:4px 0">${l}</div>`).join('')}
+          </div>`).join('')}
+      </div>
+    </div>
+    <p style="color:#93a0c2;font-size:13px;margin:16px 0 8px">${t.notes}</p>
+    <label style="font-size:11px;color:#93a0c2">Assessor notes for this tree</label>
+    <textarea id="treeNotes" placeholder="Probability estimates, mitigations, residual after controls…"></textarea>
+  `;
+  back.classList.add('open');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelector('.layout').innerHTML = `
+    <aside id="sidebar"></aside>
+    <main>
+      <svg id="wheel"></svg>
+      <div class="hint">Click any numbered node or label to open that factor’s PRA tree. Drag sliders to change spoke color and thickness.</div>
+    </main>
+    <div class="modal-back" id="modalBack">
+      <div class="modal">
+        <header>
+          <div>
+            <h1 id="modalTitle">PRA tree</h1>
+            <div class="sub" id="modalSub"></div>
+          </div>
+          <button id="closeModal">Close</button>
+        </header>
+        <div class="body" id="modalBody"></div>
+      </div>
+    </div>
+  `;
+  renderSidebar();
+  draw();
+  window.addEventListener('resize', draw);
+  document.getElementById('closeModal').onclick = () => document.getElementById('modalBack').classList.remove('open');
+  document.getElementById('modalBack').addEventListener('click', e => {
+    if (e.target.id === 'modalBack') e.target.classList.remove('open');
+  });
+  document.getElementById('randomBtn').onclick = () => {
+    FACTORS.forEach(f => state.scores[f.id] = 1 + Math.floor(Math.random()*10));
+    renderSidebar(); draw();
+  };
+  document.getElementById('resetBtn').onclick = () => {
+    FACTORS.forEach(f => state.scores[f.id] = 5);
+    renderSidebar(); draw();
+  };
+  document.getElementById('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify({ investment: state.investment, scores: state.scores, factors: FACTORS }, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pra-wheel-scores.json';
+    a.click();
+  };
+});
+</script>
+</body>
+</html>
